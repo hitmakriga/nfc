@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="lv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NFC Pieteikšanās</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #0b1120;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: #e8edf5;
+        }
+        .card {
+            max-width: 400px;
+            width: 100%;
+            background: #1a2332;
+            border-radius: 32px;
+            padding: 30px 24px 34px;
+            border: 1px solid #2e3b4e;
+            text-align: center;
+        }
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .laiks {
+            font-size: 3rem;
+            font-weight: 700;
+            color: #7aa9f0;
+            margin: 16px 0 24px;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 2px;
+        }
+        .status-box {
+            background: #101a28;
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 24px;
+            border: 1px solid #2a384b;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #status {
+            font-size: 1.3rem;
+            font-weight: 500;
+        }
+        .success { color: #6fcf97; }
+        .error { color: #f28b82; }
+        .info { color: #7aa9f0; }
+        
+        .nfc-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: #101a28;
+            padding: 12px;
+            border-radius: 60px;
+            border: 1px solid #263b52;
+            margin-bottom: 20px;
+        }
+        .dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #4c6a8a;
+            transition: 0.3s;
+        }
+        .dot.active {
+            background: #2ecc71;
+            box-shadow: 0 0 16px #2ecc7180;
+        }
+        .dot.inactive {
+            background: #e74c3c;
+        }
+        
+        button {
+            background: #2f8cf0;
+            border: none;
+            color: white;
+            font-weight: 600;
+            padding: 16px 24px;
+            border-radius: 60px;
+            font-size: 1.1rem;
+            width: 100%;
+            cursor: pointer;
+            transition: 0.15s;
+            box-shadow: 0 6px 14px rgba(47, 140, 240, 0.25);
+        }
+        button:active {
+            transform: scale(0.97);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .small {
+            font-size: 0.75rem;
+            color: #5d7390;
+            margin-top: 16px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h1>📡 NFC</h1>
+    
+    <div class="laiks" id="laiks">--:--:--</div>
+    
+    <div class="status-box">
+        <div id="status">Gaidu karti...</div>
+    </div>
+    
+    <div class="nfc-indicator">
+        <span style="font-weight:500;">NFC</span>
+        <span class="dot" id="nfcDot"></span>
+        <span id="nfcStatus" style="font-size:0.85rem; color:#8b9bb5;">izslēgts</span>
+    </div>
+    
+    <button id="nfcPoga">▶ Ieslēgt NFC</button>
+    
+    <div class="small">Nepieciešama atļauja · Android Web NFC</div>
+</div>
+
+<script>
+    (function() {
+        "use strict";
+
+        // ----- KARTES UN DARBINIEKI -----
+        const kartes = new Map([
+            ['04:56:78:9A:BC', 'EMP-1001'],
+            ['12:34:56:78:90', 'EMP-2002'],
+            ['A1:B2:C3:D4:E5', 'EMP-3003'],
+            ['FF:EE:DD:CC:BB', 'EMP-4004'],
+            ['00:11:22:33:44', 'EMP-5005'],
+        ]);
+
+        // ----- GOOGLE SHEETS (aizstāj ar savu URL) -----
+        const SHEETS_URL = 'https://script.google.com/macros/s/AKfycby-UNPnDkGcZJb-I6WmZ10q41iJAHi7UxHq4BH2-mNU0nPEb_ZRbBDcldXifQycMC_gYg/exec';
+
+        // ----- ELEMENTI -----
+        const laiksEl = document.getElementById('laiks');
+        const statusEl = document.getElementById('status');
+        const nfcDot = document.getElementById('nfcDot');
+        const nfcStatus = document.getElementById('nfcStatus');
+        const poga = document.getElementById('nfcPoga');
+
+        let nfcAktīvs = false;
+        let lasītājs = null;
+
+        // ----- LAIKA ATJAUNOŠANA -----
+        function atjaunotLaiku() {
+            const tagad = new Date();
+            const h = String(tagad.getHours()).padStart(2, '0');
+            const m = String(tagad.getMinutes()).padStart(2, '0');
+            const s = String(tagad.getSeconds()).padStart(2, '0');
+            laiksEl.textContent = `${h}:${m}:${s}`;
+        }
+        atjaunotLaiku();
+        setInterval(atjaunotLaiku, 1000);
+
+        // ----- DATUMS UN LAIKS -----
+        function iegūtDatumuLaiku() {
+            const tagad = new Date();
+            const datums = tagad.toISOString().split('T')[0];
+            const laiks = tagad.toTimeString().split(' ')[0];
+            return { datums, laiks };
+        }
+
+        // ----- SŪTĪT UZ SHEETS -----
+        async function sūtītUzSheets(karte, darbinieks, datums, laiks) {
+            if (!SHEETS_URL || SHEETS_URL.includes('YOUR_ID')) {
+                console.log('⚠️ Sheets URL nav iestatīts');
+                return;
+            }
+            try {
+                await fetch(SHEETS_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ date: datums, time: laiks, cardId: karte, employeeId: darbinieks })
+                });
+                console.log('✅ Aizsūtīts uz Sheets');
+            } catch (err) {
+                console.error('❌ Kļūda sūtot:', err);
+            }
+        }
+
+        // ----- APSTRĀDĀT KARTI -----
+        async function apstrādātKarti(kartesId) {
+            const id = kartesId.trim().toUpperCase();
+            const darbinieks = kartes.get(id);
+            const { datums, laiks } = iegūtDatumuLaiku();
+
+            if (darbinieks) {
+                statusEl.textContent = `✅ Pieteikšanās veiksmīga`;
+                statusEl.className = 'success';
+                await sūtītUzSheets(id, darbinieks, datums, laiks);
+            } else {
+                statusEl.textContent = `❌ Nepazīstama karte`;
+                statusEl.className = 'error';
+            }
+        }
+
+        // ----- NFC IESLĒGŠANA -----
+        async function ieslēgtNFC() {
+            if (!('NDEFReader' in window)) {
+                statusEl.textContent = '❌ NFC nav pieejams';
+                statusEl.className = 'error';
+                return;
+            }
+
+            if (nfcAktīvs) {
+                statusEl.textContent = '✅ NFC jau darbojas';
+                statusEl.className = 'success';
+                return;
+            }
+
+            try {
+                const lasītājs = new NDEFReader();
+                await lasītājs.scan();
+                nfcAktīvs = true;
+                nfcDot.className = 'dot active';
+                nfcStatus.textContent = 'aktīvs';
+                poga.textContent = '⏹ NFC aktīvs';
+                poga.disabled = true;
+                statusEl.textContent = '📡 Gaidu karti...';
+                statusEl.className = 'info';
+
+                lasītājs.addEventListener('reading', ({ serialNumber }) => {
+                    if (serialNumber) {
+                        apstrādātKarti(serialNumber);
+                    }
+                });
+
+                lasītājs.addEventListener('error', () => {
+                    statusEl.textContent = '❌ NFC kļūda';
+                    statusEl.className = 'error';
+                });
+
+            } catch (err) {
+                statusEl.textContent = `❌ Kļūda: ${err.message || 'nezināma'}`;
+                statusEl.className = 'error';
+                nfcDot.className = 'dot inactive';
+                nfcStatus.textContent = 'kļūda';
+            }
+        }
+
+        // ----- POGAS KLIKŠĶIS -----
+        poga.addEventListener('click', ieslēgtNFC);
+
+        // ----- SĀKUMA STĀVOKLIS -----
+        if ('NDEFReader' in window) {
+            statusEl.textContent = 'Nospiediet "Ieslēgt NFC"';
+            statusEl.className = 'info';
+        } else {
+            statusEl.textContent = '❌ NFC netiek atbalstīts';
+            statusEl.className = 'error';
+            poga.disabled = true;
+        }
+    })();
+</script>
+</body>
+</html>
