@@ -226,7 +226,7 @@
     (function() {
         "use strict";
 
-        // ----- KARTES UN DARBINIEKI -----
+        // ----- KARTES UN DARBINIEKI (šeit pievieno visas savas kartes) -----
         const kartes = new Map([
             ['54:E1:59:06', 'Oļegs'],
             ['04:56:78:9A:BC', 'EMP-1001'],
@@ -237,7 +237,7 @@
             ['AA:BB:CC:DD:EE', 'EMP-6006'],
         ]);
 
-        // 🔧 IEVIETO SAVU GOOGLE SHEETS URL ŠEIT
+        // ----- TAVA JAUNA GOOGLE SHEETS SAITE -----
         const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbz5EcjkjG8NSjb_Ax3k5aEB2CjqqmXwU5DVYEk44hIGDk_053zmdMOwHPjpDsD0OWxb5w/exec';
 
         // ----- ELEMENTI -----
@@ -295,24 +295,25 @@
 
         // ----- SŪTĪT UZ SHEETS -----
         async function sūtītUzSheets(karte, darbinieks, datums, laiks) {
-            if (!SHEETS_URL || SHEETS_URL.includes('YOUR_ID')) {
-                console.log('⚠️ Sheets URL nav iestatīts');
-                return;
-            }
             try {
-                await fetch(SHEETS_URL, {
+                const response = await fetch(SHEETS_URL, {
                     method: 'POST',
                     mode: 'no-cors',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ date: datums, time: laiks, cardId: karte, employeeId: darbinieks })
+                    body: JSON.stringify({ 
+                        date: datums, 
+                        time: laiks, 
+                        cardId: karte, 
+                        employeeId: darbinieks 
+                    })
                 });
-                console.log('✅ Aizsūtīts uz Sheets');
+                console.log('✅ Aizsūtīts uz Sheets:', { datums, laiks, karte, darbinieks });
             } catch (err) {
-                console.error('❌ Kļūda sūtot:', err);
+                console.error('❌ Kļūda sūtot uz Sheets:', err);
             }
         }
 
-        // ----- APSTRĀDĀT KARTI -----
+        // ----- APSTRĀDĀT KARTI (ŠI FUNKCIJA STRĀDĀ KATRU REIZI) -----
         async function apstrādātKarti(kartesId) {
             if (!kartesId) {
                 statusEl.textContent = '❌ Nolasīta tukša karte';
@@ -341,11 +342,12 @@
                 const teksts = `Karte <strong>${id}</strong> nav reģistrēta sistēmā.`;
                 statusEl.textContent = '❌ Nepazīstama karte';
                 statusEl.className = 'error';
+                
                 paraditPopup('🚫', 'Karte nav reģistrēta', teksts, false);
             }
         }
 
-        // ----- NFC IESLĒGŠANA -----
+        // ----- NFC IESLĒGŠANA (AR PASTĀVĪGU KLAUSĪŠANOS) -----
         async function ieslēgtNFC() {
             if (!('NDEFReader' in window)) {
                 statusEl.textContent = '❌ NFC nav pieejams';
@@ -371,11 +373,13 @@
                 statusEl.textContent = '📡 Gaidu karti...';
                 statusEl.className = 'info';
 
+                // 🔧 GALVENAIS LABAIS: Notikums, kas darbojas KATRAI kartei
                 lasītājs.addEventListener('reading', ({ serialNumber, message }) => {
                     console.log('📇 NFC lasījums:', { serialNumber, message });
                     
                     let kartesId = serialNumber;
                     
+                    // Ja serialNumber nav, mēģina iegūt no ierakstiem
                     if (!kartesId) {
                         try {
                             for (const record of message.records) {
@@ -402,15 +406,27 @@
                     }
                 });
 
-                lasītājs.addEventListener('error', (event) => {
-                    console.error('NFC kļūda:', event);
-                    statusEl.textContent = '❌ NFC kļūda';
+                // 🔧 LABAIS: Ja rodas kļūda, mēģina atjaunot NFC
+                lasītājs.addEventListener('error', async (event) => {
+                    console.error('❌ NFC kļūda:', event);
+                    statusEl.textContent = '❌ NFC kļūda, mēģina atjaunot...';
                     statusEl.className = 'error';
-                    paraditPopup('❌', 'NFC kļūda', 'Radās problēma ar NFC lasītāju', false);
+                    
+                    // Mēģina atkal aktivizēt NFC
+                    try {
+                        await lasītājs.scan();
+                        statusEl.textContent = '📡 NFC atjaunots, gaida karti...';
+                        statusEl.className = 'info';
+                    } catch (e) {
+                        console.error('Nevar atjaunot NFC:', e);
+                        statusEl.textContent = '❌ NFC kļūda, lūdzu, pārlādē lapu';
+                        statusEl.className = 'error';
+                        paraditPopup('❌', 'NFC kļūda', 'Radās problēma ar NFC lasītāju. Lūdzu, pārlādē lapu.', false);
+                    }
                 });
 
             } catch (err) {
-                console.error('NFC starta kļūda:', err);
+                console.error('❌ NFC starta kļūda:', err);
                 statusEl.textContent = `❌ Kļūda: ${err.message || 'nezināma'}`;
                 statusEl.className = 'error';
                 nfcDot.className = 'dot inactive';
@@ -419,8 +435,10 @@
             }
         }
 
+        // ----- POGAS KLIKŠĶIS -----
         poga.addEventListener('click', ieslēgtNFC);
 
+        // ----- SĀKUMA STĀVOKLIS -----
         if ('NDEFReader' in window) {
             statusEl.textContent = 'Nospiediet "Ieslēgt NFC"';
             statusEl.className = 'info';
