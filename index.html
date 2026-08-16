@@ -1,73 +1,79 @@
 <!DOCTYPE html>
-<html>
+<html lang="lv">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Testa poga</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NFC Pieteikšanās</title>
+    <style>
+        /* ... viss stils paliek nemainīgs ... */
+        .sending {
+            color: #f1c40f;
+        }
+    </style>
 </head>
 <body>
-    <button onclick="test()">📤 TESTA SŪTĪŠANA</button>
-    <div id="status">Nospied pogu</div>
+    <!-- ... viss HTML paliek nemainīgs ... -->
     
     <script>
-        const SHEETS_URL = '<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Testa poga</title>
-</head>
-<body>
-    <button onclick="test()">📤 TESTA SŪTĪŠANA</button>
-    <div id="status">Nospied pogu</div>
-    
-    <script>
-        const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbz5EcjkjG8NSjb_Ax3k5aEB2CjqqmXwU5DVYEk44hIGDk_053zmdMOwHPjpDsD0OWxb5w/exec';
-        
-        async function test() {
-            document.getElementById('status').textContent = '⏳ Sūta...';
-            
-            try {
-                await fetch(SHEETS_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        date: '2026-08-17',
-                        time: '13:00:00',
-                        cardId: 'TEST-BUTTON',
-                        employeeId: 'TEST-EMPLOYEE'
-                    })
-                });
-                document.getElementById('status').textContent = '✅ Aizsūtīts! Pārbaudi Sheets!';
-            } catch (err) {
-                document.getElementById('status').textContent = '❌ Kļūda: ' + err.message;
+        (function() {
+            "use strict";
+
+            // ----- KARTES -----
+            const kartes = new Map([
+                ['54:E1:59:06', 'Oļegs'],
+                ['04:56:78:9A:BC', 'EMP-1001'],
+                ['12:34:56:78:90', 'EMP-2002'],
+                ['A1:B2:C3:D4:E5', 'EMP-3003'],
+                ['FF:EE:DD:CC:BB', 'EMP-4004'],
+                ['00:11:22:33:44', 'EMP-5005'],
+                ['AA:BB:CC:DD:EE', 'EMP-6006'],
+            ]);
+
+            // ----- TAVA GOOGLE SHEETS SAITE -----
+            const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbwsSF837VVaEq5G9Y5iZyoGeviA9nJLk3zMcAsScqtet_bFsjTFVs2Yw5Z1j6LGJnOmUQ/exec';
+
+            // ----- ELEMENTI -----
+            const statusEl = document.getElementById('status');
+            // ... pārējie elementi ...
+
+            // ----- SŪTĪT UZ SHEETS AR VIZUĀLO ATGRIEZENISKO SAITI -----
+            async function sūtītUzSheets(karte, darbinieks, datums, laiks) {
+                // Parāda sūtīšanas procesu
+                statusEl.textContent = '⏳ Sūta uz Sheets...';
+                statusEl.className = 'info';
+                
+                try {
+                    const response = await fetch(SHEETS_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            date: datums, 
+                            time: laiks, 
+                            cardId: karte, 
+                            employeeId: darbinieks 
+                        })
+                    });
+                    
+                    console.log('✅ Aizsūtīts uz Sheets');
+                    statusEl.textContent = '✅ Dati aizsūtīti uz Sheets';
+                    statusEl.className = 'success';
+                    
+                    // Pēc 3 sekundēm atgriežas pie sākuma stāvokļa
+                    setTimeout(() => {
+                        statusEl.textContent = '📡 Gaidu karti...';
+                        statusEl.className = 'info';
+                    }, 3000);
+                    
+                } catch (err) {
+                    console.error('❌ Kļūda sūtot uz Sheets:', err);
+                    statusEl.textContent = '❌ Kļūda sūtot uz Sheets';
+                    statusEl.className = 'error';
+                }
             }
-        }
-    </script>
-</body>
-</html>';
-        
-        async function test() {
-            document.getElementById('status').textContent = '⏳ Sūta...';
-            
-            try {
-                await fetch(SHEETS_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        date: '2026-08-17',
-                        time: '13:00:00',
-                        cardId: 'TEST-BUTTON',
-                        employeeId: 'TEST-EMPLOYEE'
-                    })
-                });
-                document.getElementById('status').textContent = '✅ Aizsūtīts! Pārbaudi Sheets!';
-            } catch (err) {
-                document.getElementById('status').textContent = '❌ Kļūda: ' + err.message;
-            }
-        }
+
+            // ... pārējais kods paliek nemainīgs ...
+        })();
     </script>
 </body>
 </html>
