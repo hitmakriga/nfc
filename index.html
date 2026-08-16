@@ -188,6 +188,28 @@
             color: #5d7390;
             margin-top: 16px;
         }
+
+        /* Pilnekrāna paziņojums (tikai īsi) */
+        .fullscreen-toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(47, 140, 240, 0.9);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 30px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.5s;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        .fullscreen-toast.show {
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
@@ -222,6 +244,9 @@
     </div>
 </div>
 
+<!-- PILNEKRĀNA TOAST (īss paziņojums) -->
+<div class="fullscreen-toast" id="fullscreenToast">⛶ Pilnekrāna režīms aktivizēts</div>
+
 <script>
     (function() {
         "use strict";
@@ -251,6 +276,7 @@
         const popupTitle = document.getElementById('popupTitle');
         const popupText = document.getElementById('popupText');
         const popupBtn = document.getElementById('popupBtn');
+        const fullscreenToast = document.getElementById('fullscreenToast');
 
         let nfcAktīvs = false;
         let lasītājs = null;
@@ -447,7 +473,71 @@
             statusEl.className = 'error';
             poga.disabled = true;
         }
+
+        // ==================================================
+        // 🚀 AUTOMĀTISKS PILNEKRĀNA REŽĪMS
+        // ==================================================
+
+        let fullscreenToastTimeout = null;
+
+        function paraditPilnekranaPazinojumu() {
+            fullscreenToast.classList.add('show');
+            clearTimeout(fullscreenToastTimeout);
+            fullscreenToastTimeout = setTimeout(() => {
+                fullscreenToast.classList.remove('show');
+            }, 3000);
+        }
+
+        function aktivizetPilnekranu() {
+            const elem = document.documentElement;
+            
+            // Mēģina dažādus pārlūku variantus
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen()
+                    .then(() => paraditPilnekranaPazinojumu())
+                    .catch(() => {});
+            } else if (elem.webkitRequestFullscreen) {
+                elem.webkitRequestFullscreen();
+                paraditPilnekranaPazinojumu();
+            } else if (elem.msRequestFullscreen) {
+                elem.msRequestFullscreen();
+                paraditPilnekranaPazinojumu();
+            }
+        }
+
+        // 1. Kad lapa ir pilnībā ielādēta - aktivizē ar nelielu aizkavi
+        window.addEventListener('load', () => {
+            setTimeout(aktivizetPilnekranu, 500);
+        });
+
+        // 2. Ja lapa jau ir ielādēta (notiek ātri), mēģina vēlreiz
+        if (document.readyState === 'complete') {
+            setTimeout(aktivizetPilnekranu, 300);
+        }
+
+        // 3. Dažās ierīcēs (iOS) pilnekrānam vajag lietotāja žestu
+        // Tāpēc pirmais pieskāriens vai klikšķis aktivizē pilnekrānu
+        const pilnekranaGestuFunkcija = () => {
+            aktivizetPilnekranu();
+        };
+
+        document.addEventListener('touchstart', pilnekranaGestuFunkcija, { once: true });
+        document.addEventListener('click', pilnekranaGestuFunkcija, { once: true });
+
+        // 4. Ja lietotājs iziet no pilnekrāna (piemēram, nospiež ESC),
+        // un pēc tam pieskaras ekrānam, atkal aktivizē
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) {
+                // Lietotājs izgāja no pilnekrāna - pie nākamā pieskāriena aktivizē atkal
+                document.addEventListener('touchstart', aktivizetPilnekranu, { once: true });
+                document.addEventListener('click', aktivizetPilnekranu, { once: true });
+            }
+        });
+
+        console.log('✅ Pilnekrāna automātiskā aktivizēšana ir ieslēgta');
+
     })();
 </script>
+
 </body>
 </html>
