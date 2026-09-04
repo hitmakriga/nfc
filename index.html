@@ -60,7 +60,6 @@
         .success { color: #6fcf97; }
         .error { color: #f28b82; }
         .info { color: #7aa9f0; }
-        .warning { color: #f9ca24; }
         
         .nfc-indicator {
             display: flex;
@@ -155,9 +154,6 @@
             font-weight: 700;
             font-size: 1.2rem;
         }
-        .toast .error-text {
-            color: #f28b82;
-        }
 
         @keyframes fadeIn {
             from { opacity: 0; }
@@ -172,31 +168,6 @@
             font-size: 0.75rem;
             color: #5d7390;
             margin-top: 16px;
-        }
-        
-        .debug-info {
-            margin-top: 12px;
-            padding: 10px;
-            background: #0d1624;
-            border-radius: 8px;
-            font-size: 0.7rem;
-            color: #8b9bb5;
-            word-break: break-all;
-            text-align: left;
-            display: none;
-            max-height: 200px;
-            overflow-y: auto;
-            font-family: monospace;
-            line-height: 1.6;
-        }
-        .debug-info.show {
-            display: block;
-        }
-        .debug-info .found {
-            color: #6fcf97;
-        }
-        .debug-info .not-found {
-            color: #f28b82;
         }
     </style>
 </head>
@@ -220,9 +191,6 @@
     <button id="nfcPoga">▶ Ieslēgt NFC</button>
     
     <div class="small">Nepieciešama atļauja · Android Web NFC</div>
-    
-    <!-- Debug informācija -->
-    <div class="debug-info" id="debugInfo"></div>
 </div>
 
 <!-- TOAST POPUP -->
@@ -270,7 +238,6 @@
         const toastIcon = document.getElementById('toastIcon');
         const toastTitle = document.getElementById('toastTitle');
         const toastText = document.getElementById('toastText');
-        const debugInfo = document.getElementById('debugInfo');
 
         let nfcAktīvs = false;
         let lasītājs = null;
@@ -339,12 +306,12 @@
                     })
                 });
             } catch (err) {
-                // Kļūda - nerāda konsolē
+                // Kļūda - nerāda neko
             }
         }
 
         // ----- APSTRĀDĀT KARTI -----
-        async function apstrādātKarti(kartesId, source = 'unknown') {
+        async function apstrādātKarti(kartesId) {
             if (!kartesId) {
                 statusEl.textContent = '❌ Nolasīta tukša karte';
                 statusEl.className = 'error';
@@ -352,36 +319,24 @@
                 return;
             }
 
-            debugInfo.classList.add('show');
-            let debugHTML = `<div style="color:#f9ca24;">📱 ID (${source}):</div>`;
-            debugHTML += `<div style="color:#fff;margin-bottom:8px;"><strong>${kartesId}</strong></div>`;
-            debugHTML += `<div style="color:#5d7390;margin-bottom:8px;">Meklēju kartēs...</div>`;
-            
+            // Mēģinam atrast dažādos formātos
+            let atrasts = null;
             const formāti = [
-                { nosaukums: 'oriģināls', vērtība: kartesId },
-                { nosaukums: 'bez kolu', vērtība: kartesId.replace(/:/g, '') },
-                { nosaukums: 'lielie burti', vērtība: kartesId.toUpperCase() },
-                { nosaukums: 'mazie burti', vērtība: kartesId.toLowerCase() },
-                { nosaukums: 'bez kolu + lielie', vērtība: kartesId.replace(/:/g, '').toUpperCase() },
-                { nosaukums: 'tikai hekss', vērtība: kartesId.replace(/[^0-9A-Fa-f]/g, '').toUpperCase() },
+                kartesId,
+                kartesId.replace(/:/g, ''),
+                kartesId.toUpperCase(),
+                kartesId.toLowerCase(),
+                kartesId.replace(/:/g, '').toUpperCase(),
+                kartesId.replace(/[^0-9A-Fa-f]/g, '').toUpperCase(),
             ];
             
-            let atrasts = null;
-            let atrastsFormāts = '';
-            
             for (const f of formāti) {
-                const meklē = f.vērtība.trim();
+                const meklē = f.trim();
                 if (meklē && kartes.has(meklē)) {
                     atrasts = kartes.get(meklē);
-                    atrastsFormāts = f.nosaukums;
-                    debugHTML += `<div class="found">✅ Atrasts formātā "${f.nosaukums}": <strong>${meklē}</strong> → ${atrasts}</div>`;
                     break;
-                } else if (meklē) {
-                    debugHTML += `<div class="not-found">❌ Nav formātā "${f.nosaukums}": ${meklē}</div>`;
                 }
             }
-            
-            debugInfo.innerHTML = debugHTML;
 
             if (atrasts) {
                 const { datums, laiks } = iegūtDatumuLaiku();
@@ -415,7 +370,7 @@
                     }
                 }
             } catch (err) {
-                // Kļūda - nerāda konsolē
+                // Kļūda - nerāda neko
             }
             return dati;
         }
@@ -445,36 +400,26 @@
                 poga.disabled = true;
                 statusEl.textContent = '📡 Gaidu karti...';
                 statusEl.className = 'info';
-                debugInfo.classList.remove('show');
 
                 lasītājs.addEventListener('reading', ({ serialNumber, message }) => {
                     let kartesId = null;
-                    let avots = 'unknown';
                     
                     if (serialNumber) {
                         kartesId = serialNumber;
-                        avots = 'serialNumber';
                     }
                     
                     if (!kartesId && message && message.records) {
                         const ieraksti = izlasītNDEFIerakstus(message);
                         if (ieraksti.length > 0) {
                             kartesId = ieraksti[0];
-                            avots = `NDEF (${ieraksti.length} ieraksti)`;
                         }
                     }
                     
                     if (kartesId) {
-                        apstrādātKarti(kartesId, avots);
+                        apstrādātKarti(kartesId);
                     } else {
                         statusEl.textContent = '⚠️ Nevar nolasīt kartes ID';
                         statusEl.className = 'error';
-                        debugInfo.classList.add('show');
-                        debugInfo.innerHTML = `
-                            <div style="color:#f28b82;">❌ Nevar nolasīt ID no NFC</div>
-                            <div>📋 Serial: ${serialNumber || 'nav'}</div>
-                            <div>📋 Message: ${message ? 'ir' : 'nav'}</div>
-                        `;
                         paraditToast('⚠️', 'Nolasīšanas kļūda', 'Nevarēja nolasīt kartes identifikatoru', false);
                     }
                 });
