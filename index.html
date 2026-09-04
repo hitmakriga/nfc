@@ -108,24 +108,24 @@
             cursor: not-allowed;
         }
         
-        /* POPUP */
-        .popup-overlay {
-            display: none;
+        /* TOAST POPUP - automātiski izzūd */
+        .toast-overlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.7);
+            background: rgba(0,0,0,0.6);
+            display: none;
             align-items: center;
             justify-content: center;
             z-index: 999;
             animation: fadeIn 0.3s;
         }
-        .popup-overlay.show {
+        .toast-overlay.show {
             display: flex;
         }
-        .popup {
+        .toast {
             background: #1a2332;
             padding: 40px 30px;
             border-radius: 32px;
@@ -136,41 +136,26 @@
             box-shadow: 0 20px 60px rgba(0,0,0,0.8);
             animation: slideUp 0.3s;
         }
-        .popup .icon {
+        .toast .icon {
             font-size: 4rem;
             margin-bottom: 12px;
         }
-        .popup h2 {
+        .toast h2 {
             font-size: 1.6rem;
             margin-bottom: 8px;
             color: #e8edf5;
         }
-        .popup p {
+        .toast p {
             font-size: 1rem;
             color: #8b9bb5;
-            margin-bottom: 20px;
+            margin-bottom: 4px;
         }
-        .popup .employee-id {
+        .toast .employee-id {
             color: #6fcf97;
             font-weight: 700;
             font-size: 1.2rem;
         }
-        .popup button {
-            background: #2f8cf0;
-            border: none;
-            color: white;
-            font-weight: 600;
-            padding: 12px 32px;
-            border-radius: 60px;
-            font-size: 1rem;
-            cursor: pointer;
-            width: auto;
-            box-shadow: 0 4px 12px rgba(47, 140, 240, 0.3);
-        }
-        .popup button:active {
-            transform: scale(0.97);
-        }
-        .popup .error-text {
+        .toast .error-text {
             color: #f28b82;
         }
 
@@ -187,28 +172,6 @@
             font-size: 0.75rem;
             color: #5d7390;
             margin-top: 16px;
-        }
-
-        /* Pilnekrāna paziņojums (tikai īsi) */
-        .fullscreen-toast {
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(47, 140, 240, 0.9);
-            color: white;
-            padding: 8px 20px;
-            border-radius: 30px;
-            font-size: 0.85rem;
-            font-weight: 500;
-            z-index: 1000;
-            opacity: 0;
-            transition: opacity 0.5s;
-            pointer-events: none;
-            white-space: nowrap;
-        }
-        .fullscreen-toast.show {
-            opacity: 1;
         }
     </style>
 </head>
@@ -234,18 +197,14 @@
     <div class="small">Nepieciešama atļauja · Android Web NFC</div>
 </div>
 
-<!-- POPUP -->
-<div class="popup-overlay" id="popup">
-    <div class="popup">
-        <div class="icon" id="popupIcon">✅</div>
-        <h2 id="popupTitle">Sveiki!</h2>
-        <p id="popupText">Darbinieks</p>
-        <button id="popupBtn">Aizvērt</button>
+<!-- TOAST POPUP (automātiski izzūd) -->
+<div class="toast-overlay" id="toastOverlay">
+    <div class="toast">
+        <div class="icon" id="toastIcon">✅</div>
+        <h2 id="toastTitle">Sveiki!</h2>
+        <p id="toastText">Darbinieks</p>
     </div>
 </div>
-
-<!-- PILNEKRĀNA TOAST (īss paziņojums) -->
-<div class="fullscreen-toast" id="fullscreenToast">⛶ Pilnekrāna režīms aktivizēts</div>
 
 <script>
     (function() {
@@ -253,20 +212,13 @@
 
         // ----- KARTES UN DARBINIEKI (šeit pievieno visas savas kartes) -----
         const kartes = new Map([
-            ['54E15906', 'Oļegs'],              // bez : (54:E1:59:06)
-            ['54:E1:59:06', 'Oļegs'],           // ar :
+            ['54:E1:59:06', 'Oļegs'],
             ['04:53:C0:87:33:02:89', 'J'],
-            ['0453C087330289', 'J'],            // bez :
             ['04:03:D4:82:33:02:89', 'Igors'],
-            ['0403D482330289', 'Igors'],        // bez :
-            ['A1B2C3D4E5', 'EMP-3003'],          // bez :
-            ['A1:B2:C3:D4:E5', 'EMP-3003'],     // ar :
-            ['FFEEDDCCBB', 'EMP-4004'],          // bez :
-            ['FF:EE:DD:CC:BB', 'EMP-4004'],     // ar :
-            ['0011223344', 'EMP-5005'],          // bez :
-            ['00:11:22:33:44', 'EMP-5005'],     // ar :
-            ['AABBCCDDEE', 'EMP-6006'],          // bez :
-            ['AA:BB:CC:DD:EE', 'EMP-6006'],     // ar :
+            ['A1:B2:C3:D4:E5', 'EMP-3003'],
+            ['FF:EE:DD:CC:BB', 'EMP-4004'],
+            ['00:11:22:33:44', 'EMP-5005'],
+            ['AA:BB:CC:DD:EE', 'EMP-6006'],
         ]);
 
         // ----- TAVA JAUNA GOOGLE SHEETS SAITE -----
@@ -278,32 +230,44 @@
         const nfcDot = document.getElementById('nfcDot');
         const nfcStatus = document.getElementById('nfcStatus');
         const poga = document.getElementById('nfcPoga');
-        const popup = document.getElementById('popup');
-        const popupIcon = document.getElementById('popupIcon');
-        const popupTitle = document.getElementById('popupTitle');
-        const popupText = document.getElementById('popupText');
-        const popupBtn = document.getElementById('popupBtn');
-        const fullscreenToast = document.getElementById('fullscreenToast');
+        const toastOverlay = document.getElementById('toastOverlay');
+        const toastIcon = document.getElementById('toastIcon');
+        const toastTitle = document.getElementById('toastTitle');
+        const toastText = document.getElementById('toastText');
 
         let nfcAktīvs = false;
         let lasītājs = null;
+        let toastTimer = null;
 
-        // ----- POPUP -----
-        function paraditPopup(icon, title, text, isSuccess = true) {
-            popupIcon.textContent = icon;
-            popupTitle.textContent = title;
-            popupTitle.style.color = isSuccess ? '#6fcf97' : '#f28b82';
-            popupText.innerHTML = text;
-            popup.classList.add('show');
+        // ----- TOAST (automātiski izzūd pēc 2.5 sekundēm) -----
+        function paraditToast(icon, title, text, isSuccess = true) {
+            toastIcon.textContent = icon;
+            toastTitle.textContent = title;
+            toastTitle.style.color = isSuccess ? '#6fcf97' : '#f28b82';
+            toastText.innerHTML = text;
+            toastOverlay.classList.add('show');
+
+            // Notīrīt iepriekšējo taimeri, lai nerastos konflikti
+            if (toastTimer) {
+                clearTimeout(toastTimer);
+                toastTimer = null;
+            }
+
+            // Automātiski paslēpt pēc 2.5 sekundēm
+            toastTimer = setTimeout(() => {
+                toastOverlay.classList.remove('show');
+                toastTimer = null;
+            }, 2500);
         }
 
-        popupBtn.addEventListener('click', () => {
-            popup.classList.remove('show');
-        });
-
-        popup.addEventListener('click', (e) => {
-            if (e.target === popup) {
-                popup.classList.remove('show');
+        // Pieskaroties ārpus toasta, tas arī aizveras (bet netraucē auto-izzušanu)
+        toastOverlay.addEventListener('click', (e) => {
+            if (e.target === toastOverlay) {
+                toastOverlay.classList.remove('show');
+                if (toastTimer) {
+                    clearTimeout(toastTimer);
+                    toastTimer = null;
+                }
             }
         });
 
@@ -346,35 +310,19 @@
             }
         }
 
-        // ----- PALĪGFUNKCIJA: NOŅEM : SIMBOLUS -----
-        function noņemtKolu(id) {
-            if (!id) return '';
-            return id.replace(/:/g, '').toUpperCase();
-        }
-
-        // ----- APSTRĀDĀT KARTI (ŠI FUNKCIJA STRĀDĀ KATRU REIZI) -----
+        // ----- APSTRĀDĀT KARTI -----
         async function apstrādātKarti(kartesId) {
             if (!kartesId) {
                 statusEl.textContent = '❌ Nolasīta tukša karte';
                 statusEl.className = 'error';
-                paraditPopup('⚠️', 'Kļūda', 'Karte netika nolasīta pareizi', false);
+                paraditToast('⚠️', 'Kļūda', 'Karte netika nolasīta pareizi', false);
                 return;
             }
 
-            const originalId = kartesId.trim().toUpperCase();
-            const tīrsId = noņemtKolu(originalId); // Piemēram: "54:E1:59:06" → "54E15906"
+            const id = kartesId.trim().toUpperCase();
+            console.log('🔍 Skenēta karte:', id);
             
-            console.log('🔍 Skenēta karte (oriģināls):', originalId);
-            console.log('🔍 Skenēta karte (bez :):', tīrsId);
-            
-            // VISMAZ MĒĢINA ATRĀST PĒC TĪRĀ ID (bez :)
-            let darbinieks = kartes.get(tīrsId);
-            
-            // JA NAV, MĒĢINA ATRĀST PĒC ORIĢINĀLĀ ID (ar :)
-            if (!darbinieks) {
-                darbinieks = kartes.get(originalId);
-            }
-            
+            const darbinieks = kartes.get(id);
             const { datums, laiks } = iegūtDatumuLaiku();
 
             if (darbinieks) {
@@ -383,16 +331,16 @@
                 statusEl.textContent = `✅ Pieteikšanās veiksmīga (${darbinieks})`;
                 statusEl.className = 'success';
                 
-                paraditPopup('👋', 'Sveiki!', teksts, true);
-                await sūtītUzSheets(originalId, darbinieks, datums, laiks);
+                paraditToast('👋', 'Sveiki!', teksts, true);
+                await sūtītUzSheets(id, darbinieks, datums, laiks);
                 
             } else {
                 // ❌ NAV ATRĀSTS
-                const teksts = `Karte <strong>${originalId}</strong> nav reģistrēta sistēmā.`;
+                const teksts = `Karte <strong>${id}</strong> nav reģistrēta.`;
                 statusEl.textContent = '❌ Nepazīstama karte';
                 statusEl.className = 'error';
                 
-                paraditPopup('🚫', 'Karte nav reģistrēta', teksts, false);
+                paraditToast('🚫', 'Karte nav reģistrēta', teksts, false);
             }
         }
 
@@ -401,7 +349,7 @@
             if (!('NDEFReader' in window)) {
                 statusEl.textContent = '❌ NFC nav pieejams';
                 statusEl.className = 'error';
-                paraditPopup('❌', 'NFC nav pieejams', 'Šī ierīce neatbalsta Web NFC', false);
+                paraditToast('❌', 'NFC nav pieejams', 'Šī ierīce neatbalsta Web NFC', false);
                 return;
             }
 
@@ -422,13 +370,11 @@
                 statusEl.textContent = '📡 Gaidu karti...';
                 statusEl.className = 'info';
 
-                // 🔧 GALVENAIS LABAIS: Notikums, kas darbojas KATRAI kartei
                 lasītājs.addEventListener('reading', ({ serialNumber, message }) => {
                     console.log('📇 NFC lasījums:', { serialNumber, message });
                     
                     let kartesId = serialNumber;
                     
-                    // Ja serialNumber nav, mēģina iegūt no ierakstiem
                     if (!kartesId) {
                         try {
                             for (const record of message.records) {
@@ -451,17 +397,15 @@
                     } else {
                         statusEl.textContent = '⚠️ Nevar nolasīt kartes ID';
                         statusEl.className = 'error';
-                        paraditPopup('⚠️', 'Nolasīšanas kļūda', 'Nevarēja nolasīt kartes identifikatoru', false);
+                        paraditToast('⚠️', 'Nolasīšanas kļūda', 'Nevarēja nolasīt kartes identifikatoru', false);
                     }
                 });
 
-                // 🔧 LABAIS: Ja rodas kļūda, mēģina atjaunot NFC
                 lasītājs.addEventListener('error', async (event) => {
                     console.error('❌ NFC kļūda:', event);
                     statusEl.textContent = '❌ NFC kļūda, mēģina atjaunot...';
                     statusEl.className = 'error';
                     
-                    // Mēģina atkal aktivizēt NFC
                     try {
                         await lasītājs.scan();
                         statusEl.textContent = '📡 NFC atjaunots, gaida karti...';
@@ -470,7 +414,7 @@
                         console.error('Nevar atjaunot NFC:', e);
                         statusEl.textContent = '❌ NFC kļūda, lūdzu, pārlādē lapu';
                         statusEl.className = 'error';
-                        paraditPopup('❌', 'NFC kļūda', 'Radās problēma ar NFC lasītāju. Lūdzu, pārlādē lapu.', false);
+                        paraditToast('❌', 'NFC kļūda', 'Radās problēma ar NFC lasītāju. Lūdzu, pārlādē lapu.', false);
                     }
                 });
 
@@ -480,7 +424,7 @@
                 statusEl.className = 'error';
                 nfcDot.className = 'dot inactive';
                 nfcStatus.textContent = 'kļūda';
-                paraditPopup('❌', 'NFC kļūda', `Nevarēja ieslēgt NFC: ${err.message || 'nezināma kļūda'}`, false);
+                paraditToast('❌', 'NFC kļūda', `Nevarēja ieslēgt NFC: ${err.message || 'nezināma kļūda'}`, false);
             }
         }
 
@@ -496,68 +440,6 @@
             statusEl.className = 'error';
             poga.disabled = true;
         }
-
-        // ==================================================
-        // 🚀 AUTOMĀTISKS PILNEKRĀNA REŽĪMS
-        // ==================================================
-
-        let fullscreenToastTimeout = null;
-
-        function paraditPilnekranaPazinojumu() {
-            fullscreenToast.classList.add('show');
-            clearTimeout(fullscreenToastTimeout);
-            fullscreenToastTimeout = setTimeout(() => {
-                fullscreenToast.classList.remove('show');
-            }, 3000);
-        }
-
-        function aktivizetPilnekranu() {
-            const elem = document.documentElement;
-            
-            // Mēģina dažādus pārlūku variantus
-            if (elem.requestFullscreen) {
-                elem.requestFullscreen()
-                    .then(() => paraditPilnekranaPazinojumu())
-                    .catch(() => {});
-            } else if (elem.webkitRequestFullscreen) {
-                elem.webkitRequestFullscreen();
-                paraditPilnekranaPazinojumu();
-            } else if (elem.msRequestFullscreen) {
-                elem.msRequestFullscreen();
-                paraditPilnekranaPazinojumu();
-            }
-        }
-
-        // 1. Kad lapa ir pilnībā ielādēta - aktivizē ar nelielu aizkavi
-        window.addEventListener('load', () => {
-            setTimeout(aktivizetPilnekranu, 500);
-        });
-
-        // 2. Ja lapa jau ir ielādēta (notiek ātri), mēģina vēlreiz
-        if (document.readyState === 'complete') {
-            setTimeout(aktivizetPilnekranu, 300);
-        }
-
-        // 3. Dažās ierīcēs (iOS) pilnekrānam vajag lietotāja žestu
-        // Tāpēc pirmais pieskāriens vai klikšķis aktivizē pilnekrānu
-        const pilnekranaGestuFunkcija = () => {
-            aktivizetPilnekranu();
-        };
-
-        document.addEventListener('touchstart', pilnekranaGestuFunkcija, { once: true });
-        document.addEventListener('click', pilnekranaGestuFunkcija, { once: true });
-
-        // 4. Ja lietotājs iziet no pilnekrāna (piemēram, nospiež ESC),
-        // un pēc tam pieskaras ekrānam, atkal aktivizē
-        document.addEventListener('fullscreenchange', () => {
-            if (!document.fullscreenElement) {
-                // Lietotājs izgāja no pilnekrāna - pie nākamā pieskāriena aktivizē atkal
-                document.addEventListener('touchstart', aktivizetPilnekranu, { once: true });
-                document.addEventListener('click', aktivizetPilnekranu, { once: true });
-            }
-        });
-
-        console.log('✅ Pilnekrāna automātiskā aktivizēšana ir ieslēgta');
 
     })();
 </script>
