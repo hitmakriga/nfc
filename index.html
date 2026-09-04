@@ -305,9 +305,7 @@
                         employeeId: darbinieks 
                     })
                 });
-            } catch (err) {
-                // Kļūda - nerāda neko
-            }
+            } catch (err) {}
         }
 
         // ----- APSTRĀDĀT KARTI -----
@@ -319,7 +317,6 @@
                 return;
             }
 
-            // Mēģinam atrast dažādos formātos
             let atrasts = null;
             const formāti = [
                 kartesId,
@@ -369,9 +366,7 @@
                         }
                     }
                 }
-            } catch (err) {
-                // Kļūda - nerāda neko
-            }
+            } catch (err) {}
             return dati;
         }
 
