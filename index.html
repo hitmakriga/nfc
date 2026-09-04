@@ -60,6 +60,7 @@
         .success { color: #6fcf97; }
         .error { color: #f28b82; }
         .info { color: #7aa9f0; }
+        .warning { color: #f9ca24; }
         
         .nfc-indicator {
             display: flex;
@@ -175,17 +176,33 @@
         
         .debug-info {
             margin-top: 12px;
-            padding: 8px;
+            padding: 10px;
             background: #0d1624;
             border-radius: 8px;
             font-size: 0.7rem;
-            color: #5d7390;
+            color: #8b9bb5;
             word-break: break-all;
             text-align: left;
             display: none;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            line-height: 1.6;
         }
         .debug-info.show {
             display: block;
+        }
+        .debug-info .found {
+            color: #6fcf97;
+        }
+        .debug-info .not-found {
+            color: #f28b82;
+        }
+        .debug-info .key {
+            color: #f9ca24;
+        }
+        .debug-info .arrow {
+            color: #5d7390;
         }
     </style>
 </head>
@@ -228,18 +245,10 @@
         "use strict";
 
         // ----- KARTES UN DARBINIEKI -----
-        // Atslēgas glabājam BEZ kolu un arī ar kolu variantus
+        // PIEVIENO ŠEIT SAVAS KARTES TIEŠI TĀ, KĀ TĀS PARĀDĀS KONSOLĒ!
+        // Ja konsolē redzi "54:E1:59:06", pievieno tieši tādu pašu
         const kartes = new Map([
-            // Bez kolu (attīrīti)
-            ['54E15906', 'Oļegs'],
-            ['0453C087330289', 'J'],
-            ['0403D482330289', 'Igors'],
-            ['A1B2C3D4E5', 'EMP-3003'],
-            ['FFEEDDCCBB', 'EMP-4004'],
-            ['0011223344', 'EMP-5005'],
-            ['AABBCCDDEE', 'EMP-6006'],
-            
-            // Ar kolu (oriģinālajā formātā)
+            // Pievieno kartes tieši tādā formātā, kādā tās nolasa
             ['54:E1:59:06', 'Oļegs'],
             ['04:53:C0:87:33:02:89', 'J'],
             ['04:03:D4:82:33:02:89', 'Igors'],
@@ -248,13 +257,16 @@
             ['00:11:22:33:44', 'EMP-5005'],
             ['AA:BB:CC:DD:EE', 'EMP-6006'],
             
-            // Dažādi citi formāti, ko dažreiz atgriež NFC
-            ['54e15906', 'Oļegs'],
-            ['0453c087330289', 'J'],
-            ['0403d482330289', 'Igors'],
+            // Bez kolu (ja nu)
+            ['54E15906', 'Oļegs'],
+            ['0453C087330289', 'J'],
+            ['0403D482330289', 'Igors'],
+            ['A1B2C3D4E5', 'EMP-3003'],
+            ['FFEEDDCCBB', 'EMP-4004'],
+            ['0011223344', 'EMP-5005'],
+            ['AABBCCDDEE', 'EMP-6006'],
         ]);
 
-        // ----- GOOGLE SHEETS SAITE -----
         const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbwsSF837VVaEq5G9Y5iZyoGeviA9nJLk3zMcAsScqtet_bFsjTFVs2Yw5Z1j6LGJnOmUQ/exec';
 
         // ----- ELEMENTI -----
@@ -341,33 +353,7 @@
             }
         }
 
-        // ----- PALĪGFUNKCIJA: mēģina atrast karti dažādos formātos -----
-        function atrastDarbinieku(kartesId) {
-            if (!kartesId) return null;
-            
-            const tīrs = kartesId.replace(/:/g, '').toUpperCase().trim();
-            const arKolu = kartesId.toUpperCase().trim();
-            const mazs = kartesId.toLowerCase().trim();
-            
-            // Mēģinām dažādos formātos
-            let darbinieks = kartes.get(tīrs);
-            if (darbinieks) return darbinieks;
-            
-            darbinieks = kartes.get(arKolu);
-            if (darbinieks) return darbinieks;
-            
-            darbinieks = kartes.get(mazs);
-            if (darbinieks) return darbinieks;
-            
-            // Mēģinām noņemt visu, kas nav heksadecimāls
-            const tikaiHekss = kartesId.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
-            darbinieks = kartes.get(tikaiHekss);
-            if (darbinieks) return darbinieks;
-            
-            return null;
-        }
-
-        // ----- APSTRĀDĀT KARTI -----
+        // ----- APSTRĀDĀT KARTI AR DETAILIZĒTU DEBUG -----
         async function apstrādātKarti(kartesId, source = 'unknown') {
             if (!kartesId) {
                 statusEl.textContent = '❌ Nolasīta tukša karte';
@@ -377,34 +363,68 @@
             }
 
             console.log(`🔍 Skenēta karte (${source}):`, kartesId);
+            console.log('📋 Kartes tips:', typeof kartesId);
+            console.log('📋 Kartes garums:', kartesId.length);
             
             // Parādām debug informāciju
             debugInfo.classList.add('show');
-            debugInfo.innerHTML = `📱 ID (${source}): <strong>${kartesId}</strong><br>🔍 Meklē...`;
+            let debugHTML = `<div style="color:#f9ca24;">📱 ID (${source}):</div>`;
+            debugHTML += `<div style="color:#fff;margin-bottom:8px;"><strong>${kartesId}</strong></div>`;
+            debugHTML += `<div style="color:#5d7390;margin-bottom:8px;">Meklēju kartēs...</div>`;
             
-            const darbinieks = atrastDarbinieku(kartesId);
-            const { datums, laiks } = iegūtDatumuLaiku();
+            // Pārbaudām visus iespējamos formātus
+            const formāti = [
+                { nosaukums: 'oriģināls', vērtība: kartesId },
+                { nosaukums: 'bez kolu', vērtība: kartesId.replace(/:/g, '') },
+                { nosaukums: 'lielie burti', vērtība: kartesId.toUpperCase() },
+                { nosaukums: 'mazie burti', vērtība: kartesId.toLowerCase() },
+                { nosaukums: 'bez kolu + lielie', vērtība: kartesId.replace(/:/g, '').toUpperCase() },
+                { nosaukums: 'tikai hekss', vērtība: kartesId.replace(/[^0-9A-Fa-f]/g, '').toUpperCase() },
+            ];
+            
+            let atrasts = null;
+            let atrastsFormāts = '';
+            
+            for (const f of formāti) {
+                const meklē = f.vērtība.trim();
+                if (meklē && kartes.has(meklē)) {
+                    atrasts = kartes.get(meklē);
+                    atrastsFormāts = f.nosaukums;
+                    debugHTML += `<div class="found">✅ Atrasts formātā "${f.nosaukums}": <strong>${meklē}</strong> → ${atrasts}</div>`;
+                    break;
+                } else if (meklē) {
+                    debugHTML += `<div class="not-found">❌ Nav formātā "${f.nosaukums}": ${meklē}</div>`;
+                }
+            }
+            
+            // Parādām visas pieejamās kartes
+            debugHTML += `<div style="color:#5d7390;margin-top:8px;">📋 Pieejamās kartes (${kartes.size}):</div>`;
+            for (const [key, value] of kartes) {
+                const irAtrasts = (atrasts && kartes.get(key) === atrasts && key === formāti.find(f => f.vērtība === key)?.vērtība);
+                debugHTML += `<div style="${irAtrasts ? 'color:#6fcf97;' : 'color:#5d7390;'}">${irAtrasts ? '▶ ' : ''}${key} → ${value}</div>`;
+            }
+            
+            debugInfo.innerHTML = debugHTML;
 
-            if (darbinieks) {
-                debugInfo.innerHTML += ` ✅ Atrasts: <strong style="color:#6fcf97;">${darbinieks}</strong>`;
-                const teksts = `Sveiki, <span class="employee-id">${darbinieks}</span>!`;
-                statusEl.textContent = `✅ Pieteikšanās veiksmīga (${darbinieks})`;
+            if (atrasts) {
+                const { datums, laiks } = iegūtDatumuLaiku();
+                const teksts = `Sveiki, <span class="employee-id">${atrasts}</span>!`;
+                statusEl.textContent = `✅ Pieteikšanās veiksmīga (${atrasts})`;
                 statusEl.className = 'success';
                 
                 paraditToast('👋', 'Sveiki!', teksts, true);
-                await sūtītUzSheets(kartesId, darbinieks, datums, laiks);
+                await sūtītUzSheets(kartesId, atrasts, datums, laiks);
                 
             } else {
-                debugInfo.innerHTML += ` ❌ Nav atrasts nevienā formātā`;
-                const teksts = `Karte <strong>${kartesId}</strong> nav reģistrēta.`;
                 statusEl.textContent = '❌ Nepazīstama karte';
                 statusEl.className = 'error';
                 
+                const teksts = `Karte <strong>${kartesId}</strong> nav reģistrēta.`;
                 paraditToast('🚫', 'Karte nav reģistrēta', teksts, false);
             }
         }
 
-        // ----- IZLASĪT VISUS NDEF IERAKSTUS -----
+        // ----- IZLASĪT NDEF IERAKSTUS -----
         function izlasītNDEFIerakstus(message) {
             const dati = [];
             try {
@@ -415,15 +435,6 @@
                         if (teksts && teksts.length > 0) {
                             dati.push(teksts.trim());
                         }
-                    } else if (record.type === 'mime' && record.mediaType === 'application/octet-stream') {
-                        // Dažas kartes glabā ID kā binārus datus
-                        try {
-                            const decoder = new TextDecoder('utf-8');
-                            const teksts = decoder.decode(record.data);
-                            if (teksts && teksts.length > 0) {
-                                dati.push(teksts.trim());
-                            }
-                        } catch (e) {}
                     }
                 }
             } catch (err) {
@@ -465,45 +476,21 @@
                     let kartesId = null;
                     let avots = 'unknown';
                     
-                    // 1. PIRMAIS: mēģinām serialNumber
+                    // 1. Mēģinām serialNumber
                     if (serialNumber) {
                         kartesId = serialNumber;
                         avots = 'serialNumber';
+                        console.log('✅ Izmantoju serialNumber:', kartesId);
                     }
                     
-                    // 2. OTRĀ: ja nav serialNumber, mēģinām no NDEF ierakstiem
+                    // 2. Ja nav serialNumber, mēģinām no NDEF ierakstiem
                     if (!kartesId && message && message.records) {
                         const ieraksti = izlasītNDEFIerakstus(message);
                         if (ieraksti.length > 0) {
-                            // Ņemam pirmo derīgo ierakstu
                             kartesId = ieraksti[0];
                             avots = `NDEF (${ieraksti.length} ieraksti)`;
-                            
-                            // Ja ir vairāki ieraksti, parādām tos debugā
-                            if (ieraksti.length > 1) {
-                                console.log('Vairāki NDEF ieraksti:', ieraksti);
-                            }
+                            console.log('✅ Izmantoju NDEF ierakstu:', kartesId);
                         }
-                    }
-                    
-                    // 3. TREŠĀ: ja joprojām nav, mēģinām no paša message
-                    if (!kartesId && message) {
-                        try {
-                            // Dažreiz ID ir paslēpts dziļāk
-                            if (message.toRecords) {
-                                const visi = message.toRecords();
-                                for (const rec of visi) {
-                                    if (rec.data) {
-                                        const teksts = new TextDecoder().decode(rec.data);
-                                        if (teksts && teksts.length > 0) {
-                                            kartesId = teksts.trim();
-                                            avots = 'toRecords';
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                        } catch (e) {}
                     }
                     
                     if (kartesId) {
@@ -512,7 +499,12 @@
                         statusEl.textContent = '⚠️ Nevar nolasīt kartes ID';
                         statusEl.className = 'error';
                         debugInfo.classList.add('show');
-                        debugInfo.innerHTML = `❌ Nevar nolasīt ID no NFC<br>📋 Serial: ${serialNumber || 'nav'}<br>📋 Message: ${message ? 'ir' : 'nav'}`;
+                        debugInfo.innerHTML = `
+                            <div style="color:#f28b82;">❌ Nevar nolasīt ID no NFC</div>
+                            <div>📋 Serial: ${serialNumber || 'nav'}</div>
+                            <div>📋 Message: ${message ? 'ir' : 'nav'}</div>
+                            <div style="color:#f9ca24;margin-top:4px;">Pārbaudi konsoli (F12)!</div>
+                        `;
                         paraditToast('⚠️', 'Nolasīšanas kļūda', 'Nevarēja nolasīt kartes identifikatoru', false);
                     }
                 });
