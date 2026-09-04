@@ -198,12 +198,6 @@
         .debug-info .not-found {
             color: #f28b82;
         }
-        .debug-info .key {
-            color: #f9ca24;
-        }
-        .debug-info .arrow {
-            color: #5d7390;
-        }
     </style>
 </head>
 <body>
@@ -245,10 +239,7 @@
         "use strict";
 
         // ----- KARTES UN DARBINIEKI -----
-        // PIEVIENO ŠEIT SAVAS KARTES TIEŠI TĀ, KĀ TĀS PARĀDĀS KONSOLĒ!
-        // Ja konsolē redzi "54:E1:59:06", pievieno tieši tādu pašu
         const kartes = new Map([
-            // Pievieno kartes tieši tādā formātā, kādā tās nolasa
             ['54:E1:59:06', 'Oļegs'],
             ['04:53:C0:87:33:02:89', 'J'],
             ['04:03:D4:82:33:02:89', 'Igors'],
@@ -347,13 +338,12 @@
                         employeeId: darbinieks 
                     })
                 });
-                console.log('✅ Aizsūtīts uz Sheets:', { datums, laiks, karte, darbinieks });
             } catch (err) {
-                console.error('❌ Kļūda sūtot uz Sheets:', err);
+                // Kļūda - nerāda konsolē
             }
         }
 
-        // ----- APSTRĀDĀT KARTI AR DETAILIZĒTU DEBUG -----
+        // ----- APSTRĀDĀT KARTI -----
         async function apstrādātKarti(kartesId, source = 'unknown') {
             if (!kartesId) {
                 statusEl.textContent = '❌ Nolasīta tukša karte';
@@ -362,17 +352,11 @@
                 return;
             }
 
-            console.log(`🔍 Skenēta karte (${source}):`, kartesId);
-            console.log('📋 Kartes tips:', typeof kartesId);
-            console.log('📋 Kartes garums:', kartesId.length);
-            
-            // Parādām debug informāciju
             debugInfo.classList.add('show');
             let debugHTML = `<div style="color:#f9ca24;">📱 ID (${source}):</div>`;
             debugHTML += `<div style="color:#fff;margin-bottom:8px;"><strong>${kartesId}</strong></div>`;
             debugHTML += `<div style="color:#5d7390;margin-bottom:8px;">Meklēju kartēs...</div>`;
             
-            // Pārbaudām visus iespējamos formātus
             const formāti = [
                 { nosaukums: 'oriģināls', vērtība: kartesId },
                 { nosaukums: 'bez kolu', vērtība: kartesId.replace(/:/g, '') },
@@ -395,13 +379,6 @@
                 } else if (meklē) {
                     debugHTML += `<div class="not-found">❌ Nav formātā "${f.nosaukums}": ${meklē}</div>`;
                 }
-            }
-            
-            // Parādām visas pieejamās kartes
-            debugHTML += `<div style="color:#5d7390;margin-top:8px;">📋 Pieejamās kartes (${kartes.size}):</div>`;
-            for (const [key, value] of kartes) {
-                const irAtrasts = (atrasts && kartes.get(key) === atrasts && key === formāti.find(f => f.vērtība === key)?.vērtība);
-                debugHTML += `<div style="${irAtrasts ? 'color:#6fcf97;' : 'color:#5d7390;'}">${irAtrasts ? '▶ ' : ''}${key} → ${value}</div>`;
             }
             
             debugInfo.innerHTML = debugHTML;
@@ -438,7 +415,7 @@
                     }
                 }
             } catch (err) {
-                console.warn('Nevar nolasīt ierakstus:', err);
+                // Kļūda - nerāda konsolē
             }
             return dati;
         }
@@ -471,25 +448,19 @@
                 debugInfo.classList.remove('show');
 
                 lasītājs.addEventListener('reading', ({ serialNumber, message }) => {
-                    console.log('📇 NFC lasījums:', { serialNumber, message });
-                    
                     let kartesId = null;
                     let avots = 'unknown';
                     
-                    // 1. Mēģinām serialNumber
                     if (serialNumber) {
                         kartesId = serialNumber;
                         avots = 'serialNumber';
-                        console.log('✅ Izmantoju serialNumber:', kartesId);
                     }
                     
-                    // 2. Ja nav serialNumber, mēģinām no NDEF ierakstiem
                     if (!kartesId && message && message.records) {
                         const ieraksti = izlasītNDEFIerakstus(message);
                         if (ieraksti.length > 0) {
                             kartesId = ieraksti[0];
                             avots = `NDEF (${ieraksti.length} ieraksti)`;
-                            console.log('✅ Izmantoju NDEF ierakstu:', kartesId);
                         }
                     }
                     
@@ -503,14 +474,12 @@
                             <div style="color:#f28b82;">❌ Nevar nolasīt ID no NFC</div>
                             <div>📋 Serial: ${serialNumber || 'nav'}</div>
                             <div>📋 Message: ${message ? 'ir' : 'nav'}</div>
-                            <div style="color:#f9ca24;margin-top:4px;">Pārbaudi konsoli (F12)!</div>
                         `;
                         paraditToast('⚠️', 'Nolasīšanas kļūda', 'Nevarēja nolasīt kartes identifikatoru', false);
                     }
                 });
 
-                lasītājs.addEventListener('error', async (event) => {
-                    console.error('❌ NFC kļūda:', event);
+                lasītājs.addEventListener('error', async () => {
                     statusEl.textContent = '❌ NFC kļūda, mēģina atjaunot...';
                     statusEl.className = 'error';
                     
@@ -519,7 +488,6 @@
                         statusEl.textContent = '📡 NFC atjaunots, gaida karti...';
                         statusEl.className = 'info';
                     } catch (e) {
-                        console.error('Nevar atjaunot NFC:', e);
                         statusEl.textContent = '❌ NFC kļūda, lūdzu, pārlādē lapu';
                         statusEl.className = 'error';
                         paraditToast('❌', 'NFC kļūda', 'Radās problēma ar NFC lasītāju. Lūdzu, pārlādē lapu.', false);
@@ -527,7 +495,6 @@
                 });
 
             } catch (err) {
-                console.error('❌ NFC starta kļūda:', err);
                 statusEl.textContent = `❌ Kļūda: ${err.message || 'nezināma'}`;
                 statusEl.className = 'error';
                 nfcDot.className = 'dot inactive';
