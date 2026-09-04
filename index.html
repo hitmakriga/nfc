@@ -211,14 +211,15 @@
         "use strict";
 
         // ----- KARTES UN DARBINIEKI (šeit pievieno visas savas kartes) -----
+        // Atslēgas glabājam BEZ kolu, lai salīdzināšana būtu vienkārša
         const kartes = new Map([
-            ['54:E1:59:06', 'Oļegs'],
-            ['04:53:C0:87:33:02:89', 'J'],
-            ['04:03:D4:82:33:02:89', 'Igors'],
-            ['A1:B2:C3:D4:E5', 'EMP-3003'],
-            ['FF:EE:DD:CC:BB', 'EMP-4004'],
-            ['00:11:22:33:44', 'EMP-5005'],
-            ['AA:BB:CC:DD:EE', 'EMP-6006'],
+            ['54E15906', 'Oļegs'],        // 54:E1:59:06
+            ['0453C087330289', 'J'],      // 04:53:C0:87:33:02:89
+            ['0403D482330289', 'Igors'],  // 04:03:D4:82:33:02:89
+            ['A1B2C3D4E5', 'EMP-3003'],
+            ['FFEEDDCCBB', 'EMP-4004'],
+            ['0011223344', 'EMP-5005'],
+            ['AABBCCDDEE', 'EMP-6006'],
         ]);
 
         // ----- TAVA JAUNA GOOGLE SHEETS SAITE -----
@@ -247,20 +248,17 @@
             toastText.innerHTML = text;
             toastOverlay.classList.add('show');
 
-            // Notīrīt iepriekšējo taimeri, lai nerastos konflikti
             if (toastTimer) {
                 clearTimeout(toastTimer);
                 toastTimer = null;
             }
 
-            // Automātiski paslēpt pēc 2.5 sekundēm
             toastTimer = setTimeout(() => {
                 toastOverlay.classList.remove('show');
                 toastTimer = null;
             }, 2500);
         }
 
-        // Pieskaroties ārpus toasta, tas arī aizveras (bet netraucē auto-izzušanu)
         toastOverlay.addEventListener('click', (e) => {
             if (e.target === toastOverlay) {
                 toastOverlay.classList.remove('show');
@@ -310,6 +308,13 @@
             }
         }
 
+        // ----- PALĪGFUNKCIJA: attīra ID no visiem :-) un padara lielos burtus -----
+        function attīrītKartesId(rawId) {
+            if (!rawId) return '';
+            // Noņem visus ':' un pārveido par augšējiem burtiem
+            return rawId.replace(/:/g, '').toUpperCase().trim();
+        }
+
         // ----- APSTRĀDĀT KARTI -----
         async function apstrādātKarti(kartesId) {
             if (!kartesId) {
@@ -319,10 +324,11 @@
                 return;
             }
 
-            const id = kartesId.trim().toUpperCase();
-            console.log('🔍 Skenēta karte:', id);
+            // Attīrām ID no ':' un pārveidojam uz lielajiem burtiem
+            const tīrsId = attīrītKartesId(kartesId);
+            console.log('🔍 Skenēta karte (attīrīts ID):', tīrsId);
             
-            const darbinieks = kartes.get(id);
+            const darbinieks = kartes.get(tīrsId);
             const { datums, laiks } = iegūtDatumuLaiku();
 
             if (darbinieks) {
@@ -332,11 +338,11 @@
                 statusEl.className = 'success';
                 
                 paraditToast('👋', 'Sveiki!', teksts, true);
-                await sūtītUzSheets(id, darbinieks, datums, laiks);
+                await sūtītUzSheets(tīrsId, darbinieks, datums, laiks);
                 
             } else {
                 // ❌ NAV ATRĀSTS
-                const teksts = `Karte <strong>${id}</strong> nav reģistrēta.`;
+                const teksts = `Karte <strong>${tīrsId}</strong> nav reģistrēta.`;
                 statusEl.textContent = '❌ Nepazīstama karte';
                 statusEl.className = 'error';
                 
@@ -375,6 +381,7 @@
                     
                     let kartesId = serialNumber;
                     
+                    // Ja serialNumber nav, mēģinām izlasīt no ierakstiem
                     if (!kartesId) {
                         try {
                             for (const record of message.records) {
