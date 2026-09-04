@@ -253,13 +253,20 @@
 
         // ----- KARTES UN DARBINIEKI (šeit pievieno visas savas kartes) -----
         const kartes = new Map([
-            ['54:E1:59:06', 'Oļegs'],
+            ['54E15906', 'Oļegs'],              // bez : (54:E1:59:06)
+            ['54:E1:59:06', 'Oļegs'],           // ar :
             ['04:53:C0:87:33:02:89', 'J'],
+            ['0453C087330289', 'J'],            // bez :
             ['04:03:D4:82:33:02:89', 'Igors'],
-            ['A1:B2:C3:D4:E5', 'EMP-3003'],
-            ['FF:EE:DD:CC:BB', 'EMP-4004'],
-            ['00:11:22:33:44', 'EMP-5005'],
-            ['AA:BB:CC:DD:EE', 'EMP-6006'],
+            ['0403D482330289', 'Igors'],        // bez :
+            ['A1B2C3D4E5', 'EMP-3003'],          // bez :
+            ['A1:B2:C3:D4:E5', 'EMP-3003'],     // ar :
+            ['FFEEDDCCBB', 'EMP-4004'],          // bez :
+            ['FF:EE:DD:CC:BB', 'EMP-4004'],     // ar :
+            ['0011223344', 'EMP-5005'],          // bez :
+            ['00:11:22:33:44', 'EMP-5005'],     // ar :
+            ['AABBCCDDEE', 'EMP-6006'],          // bez :
+            ['AA:BB:CC:DD:EE', 'EMP-6006'],     // ar :
         ]);
 
         // ----- TAVA JAUNA GOOGLE SHEETS SAITE -----
@@ -339,6 +346,12 @@
             }
         }
 
+        // ----- PALĪGFUNKCIJA: NOŅEM : SIMBOLUS -----
+        function noņemtKolu(id) {
+            if (!id) return '';
+            return id.replace(/:/g, '').toUpperCase();
+        }
+
         // ----- APSTRĀDĀT KARTI (ŠI FUNKCIJA STRĀDĀ KATRU REIZI) -----
         async function apstrādātKarti(kartesId) {
             if (!kartesId) {
@@ -348,10 +361,20 @@
                 return;
             }
 
-            const id = kartesId.trim().toUpperCase();
-            console.log('🔍 Skenēta karte:', id);
+            const originalId = kartesId.trim().toUpperCase();
+            const tīrsId = noņemtKolu(originalId); // Piemēram: "54:E1:59:06" → "54E15906"
             
-            const darbinieks = kartes.get(id);
+            console.log('🔍 Skenēta karte (oriģināls):', originalId);
+            console.log('🔍 Skenēta karte (bez :):', tīrsId);
+            
+            // VISMAZ MĒĢINA ATRĀST PĒC TĪRĀ ID (bez :)
+            let darbinieks = kartes.get(tīrsId);
+            
+            // JA NAV, MĒĢINA ATRĀST PĒC ORIĢINĀLĀ ID (ar :)
+            if (!darbinieks) {
+                darbinieks = kartes.get(originalId);
+            }
+            
             const { datums, laiks } = iegūtDatumuLaiku();
 
             if (darbinieks) {
@@ -361,11 +384,11 @@
                 statusEl.className = 'success';
                 
                 paraditPopup('👋', 'Sveiki!', teksts, true);
-                await sūtītUzSheets(id, darbinieks, datums, laiks);
+                await sūtītUzSheets(originalId, darbinieks, datums, laiks);
                 
             } else {
                 // ❌ NAV ATRĀSTS
-                const teksts = `Karte <strong>${id}</strong> nav reģistrēta sistēmā.`;
+                const teksts = `Karte <strong>${originalId}</strong> nav reģistrēta sistēmā.`;
                 statusEl.textContent = '❌ Nepazīstama karte';
                 statusEl.className = 'error';
                 
